@@ -35,10 +35,43 @@
  * The script takes a lot of time
  */
 
-// POPULATE BEFORE STARTING.
-$forums = array(24=>2);
+/*
+ * Datas
+ *
+ * Users lost these datas:
+ * - User IP / Acceptable, but I'm working on this
+ * - Birthday / Acceptable
+ * - Last Visit / Acceptable
+ * - Last page visit / Acceptable
+ * - Last search / Acceptable
+ * - Numbers of warnings by moderator / Acceptable
+ * - Numbers of login attempts / Acceptable
+ * - User lang: are all set to english / Acceptable, but I'm working on this
+ * - Private messagges / Acceptable, remember to users to save before migration
+ * - User avatar / Acceptable, but I'm working on it
+ * - User signature / Acceptable, but I'm working on it
+ *
+ * Users keep these datas:
+ * - Username
+ * - Password
+ * - Registration date
+ * - Email
+ * - Data of registration
+ * - Timezone
+ * - Date format
+ *
+ * Topics:
+ * Lost formattation / Acceptable, but I'm working on it
+ * Lost date of post / NOT ACCEPTABLE
+ * Some errors with Mexican characters / NOT ACCEPTABLE
+ *
+ * Pictures in topics are not lost 
+ */
+
+// Order for ubuntu-mx categories
+$forums = array(1=>1, 24=>2, 6=>3, 7=>4, 9=>5, 8=>6, 10=>7, 15=>8, 2=>9, 29=>10, 28=>11, 11=>12, 12=>13, 13=>14, 14=>15, 3=>16, 5=>17, 4=>18, 16=>19, 22=>20, 17=>21, 18=>22, 19=>23, 20=>24, 21=>25, 23=>26, 25=>27, 26=>28, 27=>29);
 $db_username = 'old_database_username';
-$db_password = 'old_database_password'; 
+$db_password = 'old_database_password';  
 $db_database = 'ubuntu_mx';
 
 
@@ -80,9 +113,6 @@ foreach ($old->query('SELECT * FROM users WHERE uid > 0') as $u)
   );
   $users[$u['uid']]['user_id'] = user_add($users[$u['uid']]);
 }
-// Until here all ok!
-
-// THIS PART DOESN"T WORK AS EXPECTED
 
 //s/Forums/Foros
 foreach ($old->query("SELECT n.*, t.*, v.* FROM node n INNER JOIN term_node t ON t.nid=n.nid INNER JOIN node_revisions v ON v.nid=n.nid WHERE v.vid=n.vid AND n.type='forum' AND t.tid IN (SELECT term_data.tid FROM term_data INNER JOIN vocabulary ON term_data.vid=vocabulary.vid WHERE vocabulary.name='Foros')") as $topic)
@@ -100,8 +130,6 @@ foreach ($old->query("SELECT n.*, t.*, v.* FROM node n INNER JOIN term_node t ON
   $user->data['user_colour'] = ($topic['uid'] == 1 ? 'AA0000' : '');
   $user->data['is_registered'] = ($topic['uid'] != 0);
   $user->data['username'] = $users[$topic['uid']]['username'];
-  print_r($user->data);
-  print_r($auth->acl);
   $auth->acl($user->data);
 
   generate_text_for_storage($message, $uid, $bitfield, $flags, true, true, true);
@@ -114,10 +142,10 @@ foreach ($old->query("SELECT n.*, t.*, v.* FROM node n INNER JOIN term_node t ON
     'enable_smilies' => true,
     'enable_urls' => true,
     'enable_sig' => true,
-    'message' => $message,
+    'message' => utf8_encode($message),
     'message_md5' => md5($message),
     'post_edit_locked' => 0,
-    'topic_title' => $topic_title,
+    'topic_title' => utf8_encode($topic_title),
     'notify_set' => false,
     'notify' => false,
     'post_time' => $topic['timestamp'],
@@ -129,6 +157,9 @@ foreach ($old->query("SELECT n.*, t.*, v.* FROM node n INNER JOIN term_node t ON
     'poster_ip' => $user->ip,
     'topic_time_limit' => 0,
   );
+
+  // Debug only
+  //print_r($data);
 
   $poll = array();
   submit_post('post', $topic_title, 'Anonymous', ($topic['sticky'] ? POST_STICKY : POST_NORMAL), $poll, $data);
@@ -157,10 +188,10 @@ foreach ($old->query("SELECT n.*, t.*, v.* FROM node n INNER JOIN term_node t ON
       'enable_smilies' => true,
       'enable_urls' => true,
       'enable_sig' => true,
-      'message' => $message,
+      'message' => utf8_encode($message),
       'message_md5' => md5($message),
       'post_edit_locked' => 0,
-      'topic_title' => $post['subject'],
+      'topic_title' => utf8_encode($post['subject']),
       'notify_set' => false,
       'notify' => false,
       'post_time' => $post['timestamp'],
