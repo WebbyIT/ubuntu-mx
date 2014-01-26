@@ -13,20 +13,21 @@
  * Preparation (using MySql as database)
  *
  * 0. Create a db and import old drupal installation:
- * mysql -u root -p 
+ * mysql -u database_user -p 
  * CREATE DATABASE ubuntu_mx;
  * quit;
- * mysql -u root -p ubuntu_mx < ubuntumexico_forum_database.sql
+ * mysql -u database_user -p ubuntu_mx < ubuntumexico_forum_database.sql
  *
  * 1. Create a db for PhpBB:
- * mysql -u root -p 
+ * mysql -u database_user -p 
  * CREATE DATABASE ubuntu_mx_forum;
  * quit; 
  *
  * 2. Install PhpBB:
  * Follow istructions on browser
- * Create old sections and give to the "registered users" and "guests" groups the "Standard Access" permission role on each section
- * Populate array $forums with couples $oldSectionId => $newSectionId
+ * Use database ubuntu_mx_forum as database for phpbb
+ * Import base configuration:
+ * mysql -u database_user -p ubuntu_mx_forum < phpBBbaseConfig.sql
  *
  * 3: Run the script:
  * Put this script in phpbb/adm/
@@ -39,22 +40,22 @@
  * Datas
  *
  * Users lost these datas:
- * - User IP / Acceptable, but I'm working on this
+ * - User IP / Acceptable, but I'm working on this -> There is no data in accesslog table, need to check if something goes wrong during the export / import
  * - Birthday / Acceptable
  * - Last Visit / Acceptable
  * - Last page visit / Acceptable
  * - Last search / Acceptable
  * - Numbers of warnings by moderator / Acceptable
  * - Numbers of login attempts / Acceptable
- * - User lang: are all set to english / Acceptable, but I'm working on this
  * - Private messagges / Acceptable, remember to users to save before migration
  * - User avatar / Acceptable, but I'm working on it
- * - User signature / Acceptable, but I'm working on it
+ * - User signature / There is no signature in users table, need to check if something goes wrong during the export / import
  *
  * Users keep these datas:
  * - Username
  * - Password
  * - Registration date
+ * - User lang
  * - Email
  * - Data of registration
  * - Timezone
@@ -73,6 +74,7 @@ $forums = array(1=>1, 24=>2, 6=>3, 7=>4, 9=>5, 8=>6, 10=>7, 15=>8, 2=>9, 29=>10,
 $db_username = 'old_database_username';
 $db_password = 'old_database_password';  
 $db_database = 'ubuntu_mx';
+$reply_code = 'Re: '; // E.g 'Re: ' in english
 
 
 define('IN_PHPBB', true);
@@ -105,6 +107,7 @@ foreach ($old->query('SELECT * FROM users WHERE uid > 0') as $u)
     'username'      => utf8_encode($u['name']),
     'user_password' => $u['pass'], // phpBB will support md5 passwords! Yes!
     'user_email'    => $u['mail'],
+    'user_lang'     => $u['language'],
     'group_id'      => ($u['uid'] == 1 ? 5 : 2),
     'user_timezone' => ((float) $u['timezone']) / 3600,
     'user_type'     => 0,
@@ -119,8 +122,8 @@ foreach ($old->query("SELECT n.*, t.*, v.* FROM node n INNER JOIN term_node t ON
 {
   set_time_limit(600);
 
-  $message = utf8_normalize_nfc($topic['body']);
-  $topic_title = utf8_normalize_nfc($topic[21]);
+  $message = utf8_encode($topic['body']);
+  $topic_title = utf8_encode($topic[21]);
   $uid;
   $bitfield;
   $flags;
@@ -148,7 +151,7 @@ foreach ($old->query("SELECT n.*, t.*, v.* FROM node n INNER JOIN term_node t ON
     'topic_title' => utf8_encode($topic_title),
     'notify_set' => false,
     'notify' => false,
-    'post_time' => $topic['timestamp'],
+    'post_time' => $topic['created'],
     'forum_name' => '',
     'enable_indexing' => true,
     'force_approved_state' => true,
@@ -158,15 +161,15 @@ foreach ($old->query("SELECT n.*, t.*, v.* FROM node n INNER JOIN term_node t ON
     'topic_time_limit' => 0,
   );
 
-  // Debug only
-  //print_r($data);
+  // Here are printed right, but then are not saved right... 
+  echo 'Post: $data[post_time] ' . $data['post_time'] . ' $topic[created] ' . $topic['created'] . '</br>';
 
   $poll = array();
   submit_post('post', $topic_title, 'Anonymous', ($topic['sticky'] ? POST_STICKY : POST_NORMAL), $poll, $data);
 
   foreach ($old->query("SELECT * FROM comments WHERE nid='" . $topic['nid'] . "'") as $post)
   {
-    $message = utf8_normalize_nfc($post['comment']);
+    $message = utf8_encode($post['comment']);
     $uid;
     $bitfield;
     $flags;
@@ -188,7 +191,7 @@ foreach ($old->query("SELECT n.*, t.*, v.* FROM node n INNER JOIN term_node t ON
       'enable_smilies' => true,
       'enable_urls' => true,
       'enable_sig' => true,
-      'message' => utf8_encode($message),
+      'message' => $message,
       'message_md5' => md5($message),
       'post_edit_locked' => 0,
       'topic_title' => utf8_encode($post['subject']),
@@ -204,8 +207,11 @@ foreach ($old->query("SELECT n.*, t.*, v.* FROM node n INNER JOIN term_node t ON
       'topic_time_limit' => 0,
     );
 
+    // Here are printed right, but then are not saved right... 
+    echo 'Reply: $data[post_time] ' . $data['post_time'] . ' $topic[created] ' . $topic['created'] . '</br>';
+
     $poll = array();
-    submit_post('reply', (isset($post['title']) ? utf8_normalize_nfc($post['title']) : 'Re: ' . $topic_title), 'Anonymous', ($topic['sticky'] ? POST_STICKY : POST_NORMAL), $poll, $data1);
+    submit_post('reply', (isset($post['title']) ? utf8_encode($post['title']) : $reply_code . utf8_encode($topic_title)), 'Anonymous', ($topic['sticky'] ? POST_STICKY : POST_NORMAL), $poll, $data1);
   }
 } 
 
